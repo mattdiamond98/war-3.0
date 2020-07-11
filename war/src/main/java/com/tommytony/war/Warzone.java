@@ -2,10 +2,7 @@ package com.tommytony.war;
 
 import com.google.common.collect.ImmutableList;
 import com.tommytony.war.config.*;
-import com.tommytony.war.event.WarBattleWinEvent;
-import com.tommytony.war.event.WarPlayerLeaveEvent;
-import com.tommytony.war.event.WarPlayerThiefEvent;
-import com.tommytony.war.event.WarScoreCapEvent;
+import com.tommytony.war.event.*;
 import com.tommytony.war.job.InitZoneJob;
 import com.tommytony.war.job.LoadoutResetJob;
 import com.tommytony.war.job.LogKillsDeathsJob;
@@ -1000,6 +997,7 @@ public class Warzone {
 		if (lowestNoOfPlayers != null) {
 			this.assign(player, lowestNoOfPlayers);
 		}
+
 		return lowestNoOfPlayers;
 	}
 
@@ -1037,6 +1035,7 @@ public class Warzone {
 		this.respawnPlayer(team, player);
 		this.broadcast("join.broadcast", player.getName(), team.getKind().getFormattedName());
 		this.tryCallDelayedPlayers();
+		Bukkit.getPluginManager().callEvent(new WarPlayerJoinEvent(player, team));
 		return true;
 	}
 	
@@ -1489,7 +1488,7 @@ public class Warzone {
 		for (String team : winnersStr.split(" ")) {
 			winningTeams.add(this.getTeamByKind(TeamKind.getTeam(team)));
 		}
-		WarScoreCapEvent event1 = new WarScoreCapEvent(winningTeams);
+		WarScoreCapEvent event1 = new WarScoreCapEvent(this, winningTeams);
 		War.war.getServer().getPluginManager().callEvent(event1);
 
 		for (Team t : this.getTeams()) {
@@ -1672,7 +1671,7 @@ public class Warzone {
 
 	public void equipPlayerLoadoutSelection(Player player, Team playerTeam, boolean isFirstRespawn, boolean isToggle) {
 		LoadoutSelection selection = this.getLoadoutSelections().get(player.getName());
-		if (selection != null && !this.isRespawning(player) && playerTeam.getPlayers().contains(player)) {
+		if (selection != null /** && !this.isRespawning(player) **/ && playerTeam.getPlayers().contains(player)) {
 			// Make sure that inventory resets dont occur if player has already tp'ed out (due to game end, or somesuch) 
 			// - repawn timer + this method is why inventories were getting wiped as players exited the warzone. 
 			List<Loadout> loadouts = playerTeam.getInventories().resolveNewLoadouts();

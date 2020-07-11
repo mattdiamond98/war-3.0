@@ -42,7 +42,6 @@ public class WarUI extends ChestUI {
 			this.addItem(inv, 2, getCreateWarzoneItem(), createZoneAction);
 			this.addItem(inv, 6, getJoinWarzoneItem(), joinZoneAction);
 		} else {
-			this.addItem(inv, 4, getJoinWarzoneItem(), joinZoneAction);
 		}
 	}
 

@@ -111,7 +111,11 @@ public class WarEntityListener implements Listener {
 				}
 
 				// Detect death, prevent it and respawn the player
-				if (event.getDamage() >= d.getHealth()) {
+				if (event.getFinalDamage() >= d.getHealth()) {
+					if (d.getInventory().getItemInMainHand().getType() == Material.TOTEM_OF_UNDYING
+							|| d.getInventory().getItemInOffHand().getType() == Material.TOTEM_OF_UNDYING) {
+						return;
+					}
 					if (defenderWarzone.getReallyDeadFighters().contains(d.getName())) {
 						// don't re-kill a dead person
 						return;
@@ -130,7 +134,10 @@ public class WarEntityListener implements Listener {
 				} else if (defenderWarzone.isBombThief(d) && d.getLocation().distance(a.getLocation()) < 2) {
 					// Close combat, close enough to detonate
 					Bomb bomb = defenderWarzone.getBombForThief(d);
-
+					if (d.getInventory().getItemInMainHand().getType() == Material.TOTEM_OF_UNDYING
+							|| d.getInventory().getItemInOffHand().getType() == Material.TOTEM_OF_UNDYING) {
+						return;
+					}
 					// Kill the bomber
 					WarPlayerDeathEvent event1 = new WarPlayerDeathEvent(defenderWarzone, d, null, event.getCause());
 					War.war.getServer().getPluginManager().callEvent(event1);
@@ -195,24 +202,30 @@ public class WarEntityListener implements Listener {
 			// Detect death, prevent it and respawn the player
 			Player d = (Player) defender;
 			Warzone defenderWarzone = Warzone.getZoneByPlayerName(d.getName());
-			if (d != null && defenderWarzone != null && event.getDamage() >= d.getHealth()) {
+			if (d != null && defenderWarzone != null) {
 				LoadoutSelection defenderLoadoutState = defenderWarzone.getLoadoutSelections().get(d.getName());
 				if (defenderLoadoutState != null && defenderLoadoutState.isStillInSpawn()) {
 					event.setCancelled(true);
 					return;
 				}
-				if (defenderWarzone.getReallyDeadFighters().contains(d.getName())) {
-					// don't re-kill a dead person
-					return;
-				}
+				if (event.getFinalDamage() >= d.getHealth()) {
+					if (d.getInventory().getItemInMainHand().getType() == Material.TOTEM_OF_UNDYING
+							|| d.getInventory().getItemInOffHand().getType() == Material.TOTEM_OF_UNDYING) {
+						return;
+					}
+					if (defenderWarzone.getReallyDeadFighters().contains(d.getName())) {
+						// don't re-kill a dead person
+						return;
+					}
 
-				WarPlayerDeathEvent event1 = new WarPlayerDeathEvent(defenderWarzone, d, null, event.getCause());
-				War.war.getServer().getPluginManager().callEvent(event1);
-				if (!defenderWarzone.getWarzoneConfig().getBoolean(WarzoneConfig.REALDEATHS)) {
-					// fast respawn, don't really die
-					event.setCancelled(true);
+					WarPlayerDeathEvent event1 = new WarPlayerDeathEvent(defenderWarzone, d, null, event.getCause());
+					War.war.getServer().getPluginManager().callEvent(event1);
+					if (!defenderWarzone.getWarzoneConfig().getBoolean(WarzoneConfig.REALDEATHS)) {
+						// fast respawn, don't really die
+						event.setCancelled(true);
+					}
+					defenderWarzone.handleNaturalKill(d, event);
 				}
-				defenderWarzone.handleNaturalKill(d, event);
 			}
 		}
 	}
@@ -333,7 +346,11 @@ public class WarEntityListener implements Listener {
 						&& playerLoadoutState != null && playerLoadoutState.isStillInSpawn()) {
 					// don't let a player still in spawn get damaged
 					event.setCancelled(true);
-				} else if (event.getDamage() >= player.getHealth()) {
+				} else if (event.getFinalDamage() >= player.getHealth()) {
+					if (player.getInventory().getItemInMainHand().getType() == Material.TOTEM_OF_UNDYING
+							|| player.getInventory().getItemInOffHand().getType() == Material.TOTEM_OF_UNDYING) {
+						return;
+					}
 					if (zone.getReallyDeadFighters().contains(player.getName())) {
 						// don't re-count the death points of an already dead person
 						return;

@@ -26,10 +26,10 @@ public class ScoreboardSwitchTimer extends BukkitRunnable {
 						zone.setScoreboardType(ScoreboardType.LIFEPOOL);
 						break;
 					case LIFEPOOL:
-						zone.setScoreboardType(ScoreboardType.TOPKILLS);
+						zone.setScoreboardType(ScoreboardType.POINTS);
 						break;
 					case TOPKILLS:
-						zone.setScoreboardType(ScoreboardType.PLAYERCOUNT);
+						zone.setScoreboardType(ScoreboardType.POINTS);
 						break;
 					case PLAYERCOUNT:
 						zone.setScoreboardType(ScoreboardType.POINTS);

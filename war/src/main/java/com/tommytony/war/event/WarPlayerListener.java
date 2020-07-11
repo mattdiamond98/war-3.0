@@ -621,6 +621,7 @@ public class WarPlayerListener implements Listener {
 						playerWarzone.respawnPlayer(event, playerTeam, player);
 					} else {
 						// All good - proceed with scoring
+						Bukkit.getPluginManager().callEvent(new WarPlayerScoreEvent(player));
 						playerTeam.addPoint();
 						Team victim = playerWarzone.getVictimTeamForFlagThief(player);
 						
@@ -689,6 +690,7 @@ public class WarPlayerListener implements Listener {
 						playerWarzone.respawnPlayer(event, playerTeam, player);
 					} else {
 						// All good - proceed with scoring
+						Bukkit.getPluginManager().callEvent(new WarPlayerScoreEvent(player));
 						playerTeam.addPoint();
 						
 						// Notify everyone
@@ -760,6 +762,7 @@ public class WarPlayerListener implements Listener {
 						} else {
 							// All good - proceed with scoring
 							// Woot! Cake effect: 1 pt + full lifepool
+							Bukkit.getPluginManager().callEvent(new WarPlayerScoreEvent(player));
 							playerTeam.addPoint();
 							playerTeam.setRemainingLives(playerTeam.getTeamConfig().resolveInt(TeamConfig.LIFEPOOL));
 							
@@ -801,6 +804,7 @@ public class WarPlayerListener implements Listener {
 					playerWarzone.getLoadoutSelections().keySet().contains(player.getName())
 					&& playerWarzone.getLoadoutSelections().get(player.getName()).isStillInSpawn()) {
 				playerWarzone.getLoadoutSelections().get(player.getName()).setStillInSpawn(false);
+				Bukkit.getPluginManager().callEvent(new WarPlayerLeaveSpawnEvent(player));
 			}
 			
 		} else if (locZone != null && locZone.getLobby() != null && !locZone.getLobby().isLeavingZone(playerLoc) && !isMaker) {

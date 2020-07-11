@@ -10,17 +10,20 @@ import com.tommytony.war.job.HelmetProtectionTask;
 import com.tommytony.war.job.ScoreboardSwitchTimer;
 import com.tommytony.war.mapper.WarYmlMapper;
 import com.tommytony.war.mapper.WarzoneYmlMapper;
+import com.tommytony.war.placeholder.WarzonePlaceholder;
 import com.tommytony.war.structure.*;
 import com.tommytony.war.ui.UIManager;
 import com.tommytony.war.utility.*;
 import com.tommytony.war.volume.Volume;
+import net.kitesoftware.board.KiteBoard;
+import net.kitesoftware.board.criteria.AbstractCriteria;
+import net.kitesoftware.board.criteria.CriteriaRegistry;
+import net.kitesoftware.board.user.KiteUser;
 import net.milkbowl.vault.economy.Economy;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.OfflinePlayer;
+import org.bukkit.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
@@ -80,6 +83,8 @@ public class War extends JavaPlugin {
 			new ItemStack(Material.GLASS), new ItemStack(Material.OAK_WOOD),
 			new ItemStack(Material.OBSIDIAN), new ItemStack(Material.GLOWSTONE));
 	private UIManager UIManager;
+	// external
+	public static KiteBoard kiteBoard = null;
 
 	public War() {
 		super();
@@ -126,6 +131,22 @@ public class War extends JavaPlugin {
 			return;
 		}
 		this.UIManager = new UIManager(this);
+
+		// Register placeholders
+		if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+			new WarzonePlaceholder(this).register();
+		} else {
+			Bukkit.getLogger().info("Did not find PlaceholderAPI");
+		}
+
+		// KiteBoard API
+		RegisteredServiceProvider<KiteBoard> serviceProvider =
+				getServer().getServicesManager().getRegistration(KiteBoard.class);
+		if (serviceProvider != null) {
+			War.kiteBoard = serviceProvider.getProvider();
+			CriteriaRegistry criteriaRegistry = kiteBoard.getCriteriaRegistry();
+			criteriaRegistry.registerCriteria("IN_WARZONE", InWarzoneCriteria::new);
+		}
 
 		// Register events
 		PluginManager pm = this.getServer().getPluginManager();
