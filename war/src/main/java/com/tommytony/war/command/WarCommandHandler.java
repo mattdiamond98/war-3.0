@@ -1,6 +1,7 @@
 package com.tommytony.war.command;
 
 import com.tommytony.war.War;
+import com.tommytony.war.tournament.TournamentCommand;
 import com.tommytony.war.ui.WarUI;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -28,10 +29,11 @@ public class WarCommandHandler {
 	 *                The arguments
 	 * @return Success
 	 */
-	public boolean handle(CommandSender sender, Command cmd, String[] args) {
+	public boolean handle(CommandSender sender, Command cmd, String[] args) throws CloneNotSupportedException {
 		String command = cmd.getName();
 		String[] arguments = null;
-
+		TournamentCommand.onCommand(sender, cmd, args);
+		TeamCreateCommand.onCommand(sender, command, args);
 		// parse prefixed commands
 		if ((command.equals("war") || command.equals("War")) && args.length > 0) {
 			command = args[0];

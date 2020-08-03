@@ -1,9 +1,9 @@
-name: ${project.name}
-version: ${project.version}
-api-version: 1.13
-description: ${project.description}
+name: War
+version: 1.0
+api-version: 1.15
+description: A war plugin
 author: tommytony
-website: ${project.url}
+website: War.com
 main: com.tommytony.war.War
 softdepend: [WorldEdit, Vault]
 permissions:
@@ -312,3 +312,13 @@ commands:
   War:
     description: War> Same as /war. Used as fallback.
     usage: See /war.
+  starttourney:
+    usage: /<command> requiredparam
+  startround:
+    usage: /<command> requiredparam
+  createtourney:
+    usage: /<command> requiredparam
+  establishtourneys:
+    usage: /<command>
+  party:
+    usage: /<command>
