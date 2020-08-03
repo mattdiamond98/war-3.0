@@ -1,5 +1,6 @@
 package com.tommytony.war.config;
 
+import java.io.Serializable;
 import java.util.HashMap;
 
 import org.bukkit.inventory.ItemStack;
@@ -12,7 +13,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class InventoryBag {
+public class InventoryBag implements Serializable {
 
 	private List<Loadout> loadouts = new ArrayList<Loadout>();
 	private HashMap<Integer, ItemStack> reward = null;

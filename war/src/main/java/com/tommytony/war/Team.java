@@ -1,6 +1,7 @@
 package com.tommytony.war;
 
 import com.tommytony.war.config.*;
+import com.tommytony.war.tournament.TournamentTeam;
 import com.tommytony.war.utility.Direction;
 import com.tommytony.war.volume.Volume;
 import org.apache.commons.lang.Validate;
@@ -17,6 +18,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.Sign;
 
 import java.io.File;
+import java.io.Serializable;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.Map.Entry;
@@ -27,7 +29,7 @@ import java.util.logging.Level;
  * @author tommytony
  *
  */
-public class Team {
+public class Team implements Serializable, Cloneable {
 	private final Warzone warzone;
 	Random teamSpawnRandomizer = new Random();
 	private List<Player> players = new ArrayList<Player>();
@@ -42,7 +44,19 @@ public class Team {
 	private TeamKind kind;
 	private TeamConfigBag teamConfig;
 	private InventoryBag inventories;
-
+	private TournamentTeam team;
+	public void setTournamentTeam(TournamentTeam t){
+		this.team=t;
+	}
+	public TournamentTeam getTournamentTeam(){
+		return this.team;
+	}
+	protected Object clone() throws CloneNotSupportedException {
+		return super.clone();
+	}
+	public Team getCLone() throws CloneNotSupportedException {
+		return (Team)this.clone();
+	}
 	public Team(String name, TeamKind kind, List<Location> teamSpawn, Warzone warzone) {
 		this.warzone = warzone;
 		this.teamConfig = new TeamConfigBag(warzone);
@@ -83,18 +97,18 @@ public class Team {
 		int x = teamSpawn.getBlockX();
 		int y = teamSpawn.getBlockY();
 		int z = teamSpawn.getBlockZ();
-
+		int io=this.warzone.isTournamentWarzone() ? 1 : 0;
 		TeamSpawnStyle style = this.getTeamConfig().resolveSpawnStyle();
 		if (style.equals(TeamSpawnStyle.INVISIBLE)) {
 			spawnVolume.setCornerOne(this.warzone.getWorld().getBlockAt(x, y - 1, z));
-			spawnVolume.setCornerTwo(this.warzone.getWorld().getBlockAt(x, y + 3, z));
+			spawnVolume.setCornerTwo(this.warzone.getWorld().getBlockAt(x, y + (3+io), z));
 		} else if (style.equals(TeamSpawnStyle.SMALL)) {
-			spawnVolume.setCornerOne(this.warzone.getWorld().getBlockAt(x - 1, y - 1, z - 1));
-			spawnVolume.setCornerTwo(this.warzone.getWorld().getBlockAt(x + 1, y + 3, z + 1));
+			spawnVolume.setCornerOne(this.warzone.getWorld().getBlockAt(x - (1+io), y - 1, z - (1+io)));
+			spawnVolume.setCornerTwo(this.warzone.getWorld().getBlockAt(x + (1+io), y + (3+io), z + (1+io)));
 		} else {
 			// flat or big
-			spawnVolume.setCornerOne(this.warzone.getWorld().getBlockAt(x - 2, y - 1, z - 2));
-			spawnVolume.setCornerTwo(this.warzone.getWorld().getBlockAt(x + 2, y + 3, z + 2));
+			spawnVolume.setCornerOne(this.warzone.getWorld().getBlockAt(x - (2+io), y - 1, z - (2+io)));
+			spawnVolume.setCornerTwo(this.warzone.getWorld().getBlockAt(x + (2+io), y + (3+io), z + (2+io)));
 		}
 	}
 
@@ -327,7 +341,7 @@ public class Team {
 								this.getTeamConfig().resolveInt(
 										TeamConfig.LIFEPOOL)).split("\n");
 			}
-			signBlock.setType(Material.SIGN);
+			signBlock.setType(Material.OAK_SIGN);
 			org.bukkit.block.Sign block = (org.bukkit.block.Sign) signBlock
 					.getState();
 			org.bukkit.material.Sign data = (Sign) block.getData();

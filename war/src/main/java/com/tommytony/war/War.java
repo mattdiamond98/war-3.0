@@ -12,6 +12,11 @@ import com.tommytony.war.mapper.WarYmlMapper;
 import com.tommytony.war.mapper.WarzoneYmlMapper;
 import com.tommytony.war.placeholder.WarzonePlaceholder;
 import com.tommytony.war.structure.*;
+
+import com.tommytony.war.tournament.FileUtil;
+import com.tommytony.war.tournament.Tournament;
+import com.tommytony.war.tournament.TournamentTeam;
+import com.tommytony.war.tournament.TournamentWarzone;
 import com.tommytony.war.ui.UIManager;
 import com.tommytony.war.utility.*;
 import com.tommytony.war.volume.Volume;
@@ -27,6 +32,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -43,6 +49,7 @@ import java.util.*;
 import java.util.logging.FileHandler;
 import java.util.logging.Formatter;
 import java.util.logging.Level;
+import java.util.Map.Entry;
 
 /**
  * Main class of War
@@ -65,6 +72,9 @@ public class War extends JavaPlugin {
 	private final WarConfigBag warConfig = new WarConfigBag();
 	private final WarzoneConfigBag warzoneDefaultConfig = new WarzoneConfigBag();
 	private final TeamConfigBag teamDefaultConfig = new TeamConfigBag();
+	private static ArrayList<TournamentTeam> activeteams=new ArrayList<TournamentTeam>();
+	private static ArrayList<TournamentTeam> teamstosave=new ArrayList<TournamentTeam>();
+	private static HashMap<TournamentTeam, HashMap<TournamentTeam, Warzone>> UnacceptedChallenges=new HashMap<TournamentTeam, HashMap<TournamentTeam, Warzone>>();
 	// general
 	private WarPlayerListener playerListener = new WarPlayerListener();
 	private WarEntityListener entityListener = new WarEntityListener();
@@ -72,6 +82,7 @@ public class War extends JavaPlugin {
 	private WarCommandHandler commandHandler = new WarCommandHandler();
 	private PluginDescriptionFile desc = null;
 	private boolean loaded = false;
+	private static HashMap<Player, List<TournamentTeam>> JoinRequests=new HashMap<Player, List<TournamentTeam>>();
 	// Zones and hub
 	private List<Warzone> warzones = new ArrayList<Warzone>();
 	private WarHub warHub;
@@ -90,7 +101,48 @@ public class War extends JavaPlugin {
 		super();
 		War.war = this;
 	}
+	public static void JoinRequest(Player p, TournamentTeam t){
+		if(!JoinRequests.containsKey(p)){
+			JoinRequests.put(p, new ArrayList<TournamentTeam>());
 
+		}
+		JoinRequests.get(p).add(t);
+	}
+	public static void denyJoinRequest(Player p, TournamentTeam t){
+
+
+	JoinRequests.get(p).remove(t);
+
+	}
+	public static void clearJoinRequests(Player p){
+		JoinRequests.remove(p);
+	}
+	public static HashMap<Player, List<TournamentTeam>> getJoinRequests(){
+		return JoinRequests;
+	}
+	public static void createChallenge(TournamentTeam t1, TournamentTeam t2, Warzone zone){
+		HashMap<TournamentTeam, Warzone> z = null;
+		if(!UnacceptedChallenges.containsKey(t1)){
+		z=new HashMap<TournamentTeam, Warzone>(){{
+
+			this.put(t2, zone);
+		}};}else{
+			z=UnacceptedChallenges.get(t1);
+			UnacceptedChallenges.remove(t1);
+			z.put(t2, zone);
+		}
+
+		UnacceptedChallenges.put(t1, z);
+	}
+	public static void removeChallenge(TournamentTeam t){
+		UnacceptedChallenges.remove(t);
+	}
+	public static HashMap<TournamentTeam, HashMap<TournamentTeam, Warzone>> getActiveChallenges(){
+		return UnacceptedChallenges;
+	}
+	public static void saveTeam(TournamentTeam t){
+		teamstosave.add(t);
+	}
 	public static void reloadLanguage() {
 		String[] parts = War.war.getWarConfig().getString(WarConfig.LANGUAGE).replace("-", "_").split("_");
 		Locale lang = new Locale(parts[0]);
@@ -99,12 +151,29 @@ public class War extends JavaPlugin {
 		}
 		War.messages = ResourceBundle.getBundle("messages", lang);
 	}
+	public static void putInTeams(TournamentTeam t){
+		activeteams.add(t);
+	}
+	public static void removeFromTeams(TournamentTeam s){
+		activeteams.remove(s);
+	}
+	public static ArrayList<TournamentTeam> getTeams(){
+		return activeteams;
+	}
+
 
 	/**
 	 * @see JavaPlugin#onEnable()
 	 * @see War#loadWar()
 	 */
+
 	public void onEnable() {
+		if(!new File(getDataFolder().getPath()+"/Teams").exists()){
+			new File(getDataFolder().getPath()+"/Teams").mkdir();
+		}
+		if(new File(getDataFolder().getPath()+"/Teams", "SavedTeams.dat").exists()){
+			teamstosave= (ArrayList<TournamentTeam>) FileUtil.load(new File(getDataFolder().getPath()+"/Teams", "SavedTeams.dat"));
+		}
 		this.loadWar();
 	}
 
@@ -113,7 +182,12 @@ public class War extends JavaPlugin {
 	 * @see War#unloadWar()
 	 */
 	public void onDisable() {
+		if(!new File(getDataFolder().getPath()+"/Teams").exists()){
+			new File(getDataFolder().getPath()+"/Teams").mkdir();
+		}
+		FileUtil.save(teamstosave, new File(getDataFolder().getPath()+"/Teams", "SavedTeams.dat"));
 		this.unloadWar();
+
 	}
 
 	/**
@@ -154,6 +228,7 @@ public class War extends JavaPlugin {
 		pm.registerEvents(this.entityListener, this);
 		pm.registerEvents(this.blockListener, this);
 		pm.registerEvents(this.UIManager, this);
+		pm.registerEvents((Listener) new Warzone(), this);
 
 		// Add defaults
 		warConfig.put(WarConfig.BUILDINZONESONLY, false);
@@ -329,7 +404,7 @@ public class War extends JavaPlugin {
 		this.playerListener.purgeLatestPositions();
 
 		HandlerList.unregisterAll(this);
-		this.log("War v" + this.desc.getVersion() + " is off.", Level.INFO);
+		this.log("War v" + "5" + " is off.", Level.INFO);
 		this.setLoaded(false);
 	}
 
@@ -337,7 +412,11 @@ public class War extends JavaPlugin {
 	 * @see org.bukkit.command.CommandExecutor#onCommand(org.bukkit.command.CommandSender, org.bukkit.command.Command, String, String[])
 	 */
 	public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args) {
-		return this.commandHandler.handle(sender, cmd, args);
+		try {
+			return this.commandHandler.handle(sender, cmd, args);
+		} catch (CloneNotSupportedException e) {
+			return false;
+		}
 	}
 
 	/**

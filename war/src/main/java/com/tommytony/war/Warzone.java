@@ -11,6 +11,7 @@ import com.tommytony.war.job.ZoneTimeJob;
 import com.tommytony.war.mapper.LoadoutYmlMapper;
 import com.tommytony.war.mapper.ZoneVolumeMapper;
 import com.tommytony.war.structure.*;
+import com.tommytony.war.tournament.TournamentTeam;
 import com.tommytony.war.utility.*;
 import com.tommytony.war.volume.Volume;
 import com.tommytony.war.volume.ZoneVolume;
@@ -23,12 +24,18 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.type.Bell;
+import org.bukkit.conversations.Conversation;
+import org.bukkit.conversations.ConversationFactory;
 import org.bukkit.entity.*;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -36,10 +43,12 @@ import org.bukkit.permissions.Permissible;
 import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 
+import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -53,7 +62,7 @@ import java.util.logging.Level;
  * @author tommytony
  * @package com.tommytony.war
  */
-public class Warzone {
+public class Warzone implements Serializable, Listener {
 
 
 	static final Comparator<Team> LEAST_PLAYER_COUNT_ORDER = new Comparator<Team>() {
@@ -62,7 +71,7 @@ public class Warzone {
 			return arg0.getPlayers().size() - arg1.getPlayers().size();
 		}
 	};
-	private final List<Team> teams = new ArrayList<Team>();
+	private final List<Team> teams = new ArrayList< Team>();
 	private final List<Monument> monuments = new ArrayList<Monument>();
 	private final List<CapturePoint> capturePoints = new ArrayList<CapturePoint>();
 	private final List<Bomb> bombs = new ArrayList<Bomb>();
@@ -74,11 +83,14 @@ public class Warzone {
 	private final WarzoneConfigBag warzoneConfig;
 	private final TeamConfigBag teamDefaultConfig;
 	private String name;
+	private Boolean b1=false;
+	private Boolean processfinished=false;
 	private ZoneVolume volume;
 	private World world;
 	private Location teleport;
 	private ZoneLobby lobby;
 	private Location rallyPoint;
+	private Boolean isTournamentWarzone=false;
 	private List<ZoneWallGuard> zoneWallGuards = new ArrayList<ZoneWallGuard>();
 	private HashMap<String, PlayerState> playerStates = new HashMap<String, PlayerState>();
 	private HashMap<UUID, Team> flagThieves = new HashMap<UUID, Team>();
@@ -93,22 +105,27 @@ public class Warzone {
 	private InventoryBag defaultInventories = new InventoryBag();
 
 	private Scoreboard scoreboard;
-	
+
 	private HubLobbyMaterials lobbyMaterials = null;
 	private WarzoneMaterials warzoneMaterials = new WarzoneMaterials(
 			new ItemStack(Material.OBSIDIAN), new ItemStack(Material.OAK_FENCE),
 			new ItemStack(Material.GLOWSTONE));
-	
+
 	private boolean isEndOfGame = false;
 	private boolean isReinitializing = false;
 	//private final Object gameEndLock = new Object();
 
-    private boolean pvpReady = true;
+	private boolean pvpReady = true;
 	private Random killSeed = new Random();
 	// prevent tryCallDelayedPlayers from being recursively called by Warzone#assign
 	private boolean activeDelayedCall = false;
 	private ScoreboardType scoreboardType;
 
+
+	public Warzone(){
+		this.warzoneConfig = new WarzoneConfigBag(this);
+		this.teamDefaultConfig = new TeamConfigBag();
+	}
 	public Warzone(World world, String name) {
 		this.world = world;
 		this.name = name;
@@ -121,7 +138,12 @@ public class Warzone {
 		if (scoreboardType == ScoreboardType.SWITCHING)
 			scoreboardType = ScoreboardType.LIFEPOOL;
 	}
-
+	public void SetTournamentWarzone(){
+		this.isTournamentWarzone=true;
+		War.war.getWarHub().initialize();
+	}
+	public Boolean secondtrue(){return this.b1;}
+	public void setsecond(Boolean b3){this.b1=b3;}
 	public static Warzone getZoneByName(String name) {
 		Warzone bestGuess = null;
 		for (Warzone warzone : War.war.getWarzones()) {
@@ -193,7 +215,9 @@ public class Warzone {
 		}
 		return null;
 	}
-
+	public void putinAttachments(Player p, PermissionAttachment pa){
+		this.attachments.put(p, pa);
+	}
 	public String getTeamInformation() {
 		StringBuilder teamsMessage = new StringBuilder(War.war.getString("zone.teaminfo.prefix"));
 		if (this.getTeams().isEmpty()) {
@@ -497,8 +521,8 @@ public class Warzone {
 				player.addPotionEffect(effect);
 			} else {
 				War.war.getLogger().log(Level.WARNING,
-					"Failed to apply potion effect {0} in warzone {1}.",
-					new Object[] {potionEffect, name});
+						"Failed to apply potion effect {0} in warzone {1}.",
+						new Object[] {potionEffect, name});
 			}
 		}
 
@@ -534,7 +558,7 @@ public class Warzone {
 
 			War.war.getServer().getScheduler().scheduleSyncDelayedTask(War.war, new Runnable() {
 				public void run() {
-				    respawn.remove(player);
+					respawn.remove(player);
 					War.war.getServer().getScheduler().scheduleSyncDelayedTask(War.war, job);
 				}
 			}, team.getTeamConfig().resolveInt(TeamConfig.RESPAWNTIMER) * 20L); // 20 ticks = 1 second
@@ -664,7 +688,7 @@ public class Warzone {
 		player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
 	}
 
-	private void preventItemHackingThroughOpenedInventory(Player player) {
+	public void preventItemHackingThroughOpenedInventory(Player player) {
 		InventoryView openedInv = player.getOpenInventory();
 		if (openedInv.getType() == InventoryType.CRAFTING) {
 			// prevent abuse of personal crafting slots (this behavior doesn't seem to happen
@@ -820,6 +844,10 @@ public class Warzone {
 		return this.world;
 	}
 
+	public void SetNotTournamentWarzone(){
+		this.isTournamentWarzone=false;
+		War.war.getWarHub().initialize();
+	}
 	public void setWorld(World world) {
 		this.world = world;
 	}
@@ -943,6 +971,104 @@ public class Warzone {
 		}
 		return null;
 	}
+	public void setupChallenge(TournamentTeam t){
+		this.processfinished=false;
+	this.SetTournamentWarzone();
+
+	Team team=this.getTeams().get(0);
+
+	if(team.getPlayers().size()>0){
+		team=this.getTeams().get(1);
+	}
+	Volume v=team.getSpawnVolumes().get(team.getRandomSpawn());
+	for(Player p:t.getPlayers()){
+	this.assign(p, team);
+	p.teleport(team.getRandomSpawn());
+
+	}
+
+	for(int y=v.getMinY()+1; y<=v.getMaxY(); y++){
+		for(int x=v.getMinX(); x<=v.getMaxX(); x++){
+			new Location(this.getWorld(), x, y, v.getMinZ()).getBlock().setType(Material.BARRIER);
+			new Location(this.getWorld(), x, y, v.getMaxZ()).getBlock().setType(Material.BARRIER);
+		}
+		for(int z=v.getMinZ(); z<=v.getMaxZ(); z++){
+			new Location(this.getWorld(), v.getMinX(), y, z).getBlock().setType(Material.BARRIER);
+			new Location(this.getWorld(), v.getMaxX(), y, z).getBlock().setType(Material.BARRIER);
+		}
+	}
+
+this.processfinished=true;
+	}
+	public void StartCountdown(){
+		for(Team t:this.getTeams()){
+
+			for(final Player p:t.getPlayers()){
+				final int[] i = {0};
+
+				BukkitRunnable run3=new BukkitRunnable(){
+
+					@Override
+					public void run() {
+					if(i[0] <6){
+					p.sendTitle(String.valueOf(5-i[0]), "", 5, 10, 5);
+				      i[0]++;}
+					if(i[0]>=6){
+
+						p.sendTitle("GO!", "", 5, 10, 5);
+
+						Volume v=Warzone.getZoneByLocation(p).getPlayerTeam(p.getName()).getSpawnVolumes().get(Warzone.getZoneByLocation(p).getPlayerTeam(p.getName()).getRandomSpawn());
+						for(int y=v.getMinY()+1; y<=v.getMaxY(); y++){
+							for(int x=v.getMinX(); x<=v.getMaxX(); x++){
+								new Location(v.getWorld(), x, y, v.getMinZ()).getBlock().setType(Material.AIR);
+								new Location(v.getWorld(), x, y, v.getMaxZ()).getBlock().setType(Material.AIR);
+							}
+							for(int z=v.getMinZ(); z<=v.getMaxZ(); z++){
+								new Location(v.getWorld(), v.getMinX(), y, z).getBlock().setType(Material.AIR);
+								new Location(v.getWorld(), v.getMaxX(), y, z).getBlock().setType(Material.AIR);
+							}
+						}
+						this.cancel();
+					}
+					}
+
+				};
+				run3.runTaskTimer(War.war, 2L, 20L);
+
+
+			}
+		}
+
+
+	}
+	public void HandleConversation(TournamentTeam[] tournamentTeams){
+		for(TournamentTeam t:tournamentTeams){
+
+			ConversationFactory cf=new ConversationFactory(War.war);
+			Conversation c=cf.withFirstPrompt(new ReadyPrompt( this)).withLocalEcho(true).buildConversation(t.getOwner());
+			c.begin();
+		}
+	}
+
+	/*@EventHandler
+	public void onPlayerTp(PlayerTeleportEvent e){
+		Bukkit.broadcastMessage("debug message5");
+		if(this.isTournamentWarzone){
+			if(e.getTo().equals(Team.getTeamByPlayerName(e.getPlayer().getName()).getRandomSpawn())){
+			boolean check=true;
+			for(Team t:this.getTeams()){
+
+					if(t.getPlayers().size()!=t.getTournamentTeam().getPlayers().size()){
+							check=false;
+					}
+
+			}
+			if(check){
+				Bukkit.broadcastMessage("debug message2");
+				this.HandleConversation();
+			}
+		}}
+	}*/
 
 	public boolean protectZoneWallAgainstPlayer(Player player) {
 		List<BlockFace> nearestWalls = this.getNearestWalls(player.getLocation());
@@ -984,8 +1110,12 @@ public class Warzone {
 	public void setLobby(ZoneLobby lobby) {
 		this.lobby = lobby;
 	}
-	
+	public boolean isTournamentWarzone(){
+		return this.isTournamentWarzone;
+	}
+
 	public Team autoAssign(Player player) {
+
 		Collections.sort(teams, LEAST_PLAYER_COUNT_ORDER);
 		Team lowestNoOfPlayers = null;
 		for (Team team : this.teams) {
@@ -1011,6 +1141,7 @@ public class Warzone {
 	 * @return false if player does not have permission to join this team.
 	 */
 	public boolean assign(Player player, Team team) {
+		if((this.isTournamentWarzone()&&!this.processfinished)||!this.isTournamentWarzone()){
 		if (!War.war.canPlayWar(player, team)) {
 			War.war.badMsg(player, "join.permission.single");
 			return false;
@@ -1035,10 +1166,10 @@ public class Warzone {
 		this.respawnPlayer(team, player);
 		this.broadcast("join.broadcast", player.getName(), team.getKind().getFormattedName());
 		this.tryCallDelayedPlayers();
-		Bukkit.getPluginManager().callEvent(new WarPlayerJoinEvent(player, team));
+		Bukkit.getPluginManager().callEvent(new WarPlayerJoinEvent(player, team));}
 		return true;
 	}
-	
+
 	private void dropItems(Location location, ItemStack[] items) {
 		for (ItemStack item : items) {
 			if (item == null || item.getType() == Material.AIR) {
@@ -1047,7 +1178,7 @@ public class Warzone {
 			location.getWorld().dropItem(location, item);
 		}
 	}
-	
+
 	/**
 	 * Send death messages and process other records before passing off the
 	 * death to the {@link #handleDeath(Player)} method.
@@ -1148,7 +1279,7 @@ public class Warzone {
 				break;
 		}
 	}
-	
+
 	/**
 	 * Handle death messages before passing to {@link #handleDeath(Player)}
 	 * for post-processing. It's like
@@ -1217,6 +1348,7 @@ public class Warzone {
 	}
 
 	private void handleTeamLoss(Team losingTeam, Player player) {
+
 		StringBuilder teamScores = new StringBuilder();
 		List<Team> winningTeams = new ArrayList<Team>(teams.size());
 		for (Team team : this.teams) {
@@ -1269,7 +1401,14 @@ public class Warzone {
 
 	public void reinitialize() {
 		this.isReinitializing = true;
+
+if(this.getPlayerCount()==0){
+
+	this.SetNotTournamentWarzone();
+	this.processfinished=false;
+}
 		this.getVolume().resetBlocksAsJob();
+
 	}
 
 	public void handlePlayerLeave(Player player, Location destination, PlayerMoveEvent event, boolean removeFromTeam) {
@@ -1441,7 +1580,7 @@ public class Warzone {
 	public Bomb getBombForThief(Player thief) {
 		return this.bombThieves.get(thief.getUniqueId());
 	}
-	
+
 	// Cake
 
 	public void removeBombThief(Player thief) {
@@ -1514,8 +1653,8 @@ public class Warzone {
 						}
 						if (!r.transactionSuccess()) {
 							War.war.getLogger().log(Level.WARNING,
-								"Failed to reward player {0} ${1}. Error: {2}",
-								new Object[] {tp.getName(), ecoReward, r.errorMessage});
+									"Failed to reward player {0} ${1}. Error: {2}",
+									new Object[] {tp.getName(), ecoReward, r.errorMessage});
 						}
 					}
 				}
@@ -1625,7 +1764,7 @@ public class Warzone {
 		tryCallDelayedPlayers();
 	}
 
-	private void tryCallDelayedPlayers() {
+	public void tryCallDelayedPlayers() {
 		if (activeDelayedCall || (!isEnoughPlayers() && !testEnoughPlayers(null, true))) {
 			return;
 		}
@@ -1652,11 +1791,11 @@ public class Warzone {
 		// if no authors, all zonemakers can edit the zone
 		return authors.size() == 0 || authors.contains(player.getName());
 	}
-		
+
 	public void addAuthor(String playerName) {
 		authors.add(playerName);
 	}
-	
+
 	public List<String> getAuthors() {
 		return this.authors;
 	}
@@ -1672,8 +1811,8 @@ public class Warzone {
 	public void equipPlayerLoadoutSelection(Player player, Team playerTeam, boolean isFirstRespawn, boolean isToggle) {
 		LoadoutSelection selection = this.getLoadoutSelections().get(player.getName());
 		if (selection != null /** && !this.isRespawning(player) **/ && playerTeam.getPlayers().contains(player)) {
-			// Make sure that inventory resets dont occur if player has already tp'ed out (due to game end, or somesuch) 
-			// - repawn timer + this method is why inventories were getting wiped as players exited the warzone. 
+			// Make sure that inventory resets dont occur if player has already tp'ed out (due to game end, or somesuch)
+			// - repawn timer + this method is why inventories were getting wiped as players exited the warzone.
 			List<Loadout> loadouts = playerTeam.getInventories().resolveNewLoadouts();
 			List<String> sortedNames = LoadoutYmlMapper.sortNames(Loadout.toLegacyFormat(loadouts));
 			sortedNames.remove("first");
@@ -1747,16 +1886,16 @@ public class Warzone {
 			if (originalState.getHelmet() != null) {
 				playerItems.put(103, originalState.getHelmet());
 			}
-			
+
 		}
-		
+
 		return playerItems;
 	}
 
 	public WarzoneConfigBag getWarzoneConfig() {
 		return this.warzoneConfig;
 	}
-	
+
 	public TeamConfigBag getTeamDefaultConfig() {
 		return this.teamDefaultConfig;
 	}
@@ -1788,7 +1927,18 @@ public class Warzone {
 	public boolean isReinitializing() {
 		return this.isReinitializing;
 	}
+	public void removeFromPlayerStates(String s){
 
+		this.playerStates.remove(s);
+	}
+	public void addtoRespawn(Player p){
+		this.respawn.add(p);
+
+	}
+	public void removeFromRespawn(Player p){
+
+		this.respawn.remove(p);
+	}
 //	public Object getGameEndLock() {
 //		return gameEndLock;
 //	}
@@ -2123,7 +2273,7 @@ public class Warzone {
 	public boolean getPvpReady() {
 		return this.pvpReady;
 	}
-	
+
 	public void setPvpReady(boolean ready) {
 		this.pvpReady = ready;
 	}
